@@ -50,3 +50,34 @@ least 8MiB, and you can get this with flash memory.  NOR and NAND flash are
 types of non volatile memory.  NOR is faster/better and more expensive, and
 might be used for what would traditionally be ROM layers like a base system,
 while you might use NAND for larger user data or logs, etc.
+
+An RS-232 serial port is used for debugging.  SoCs can load boot code directly
+from interfaces like SD cards or USB.
+
+### BeagleBone Black specs
+
+ARM 1GHz CPU, 512MB RAM, 4GiB onboard flash eMMC, serial port, microSD
+connector, USB port, Ethernet port, HDMI port
+
+You can fit "daughter" boards called 'capes'.
+
+You also need this:
+
+> An RS-232 cable that can interface with the 6-pin 3.3V TTL level signals
+> provided by the board. The Beagleboard website has links to compatible cables.
+
+I definitely don't have this at present.
+
+The current one is BEAGLEBONE BLK REV C AM3358BZCZ
+
+### QEMU
+
+Qemu can emulate different pieces of hardware.
+
+`qemu-system-arm` is the basic command to emulate an ARM system.
+
+QEMU can connect files on the host system to e.g. the SD card of the emulated
+device.
+
+You need to use `tunctl` on the host to create a network interface on the host which
+connects to the guest.  CS gives the command for this.
