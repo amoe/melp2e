@@ -81,3 +81,49 @@ device.
 
 You need to use `tunctl` on the host to create a network interface on the host which
 connects to the guest.  CS gives the command for this.
+
+## Ch2: Learning about toolchains
+
+CS will show how to create a toolchain using _crosstool-NG_.
+
+A toolchain is this:
+* Compiler
+* Linker
+* Runtime libraries implementing POSIX
+
+You need it to build the other elements so it's the most fundamental.  It needs
+to support some form of assembly, C, and C++.
+
+Clang can be used as a tool to build the kernel but this is still a variation
+rather than the main method.  GCC is the main/preferred choice.
+
+The GNU toolchain has the following parts:
+
+* binutils (assembler and linker)
+* GCC
+* C library (there are multiple options here.)
+* GDB debugger
+
+You need to generate a special set of kernel headers (pp21).  Kernel headers are
+always backwards compatible so you just need to use a set of kernel headers that
+is older than your kernel target.
+
+There are two types of toolchain: a native toolchain and a cross toolchain.
+Mostly we will use a cross toolchain in order to do development and compilation
+on a fast system and then to transfer it to the limited resource system.  It is
+also good to introduce a distinction between the host and the target.  If they
+use the same architecture, it might be tempting to native compile on the host.
+But this might break in strange ways later.  There are certain arguments for
+native compilation but they're mostly outside the scope of MELP.
+
+CPU architectures: Not all CPUs have a hardware FPU.  Hence the existence of
+things like fixed-point decoders for Vorbis for use in embedded applications.
+The toolchain can be configured to generate calls to software implementations of
+floating point math instead.  There is also an ABI/calling convention.  The ABI
+is not really a property of the CPU itself but rather is an agreement/contract
+between the compiler and the operating system.  However the ABI will be defined
+in the terms of the capabilities provided by the CPU -- and actually some
+manufacturers do define a detailed ABI especially ARM.
+
+ARM has two diverged ABIs, one for processors with FPUs, and one for processors
+without.  EABI is preferred, but requires FPU.
