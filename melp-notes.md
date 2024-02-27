@@ -126,4 +126,54 @@ in the terms of the capabilities provided by the CPU -- and actually some
 manufacturers do define a detailed ABI especially ARM.
 
 ARM has two diverged ABIs, one for processors with FPUs, and one for processors
-without.  EABI is preferred, but requires FPU.
+without.  EABIHF is preferred, but requires FPU.
+
+The toolchain has a specific name.  This consists of CPU, vendor (optional),
+kernel and a userspace component.  These are pretty much opaque strings.  You
+can check the toolchain tuple by running `gcc -dumpmachine`.  For instance, I
+get `x86_64-linux-gnu` on my Debian system.  The tuple prefixes all the tools in
+the PATH, and the `gcc` command is usually a link to the tuple-qualified
+version:
+
+    amoe@sprinkhaan $ ls -l /usr/bin/gcc-12                                                                                                                                                                     0.01s 
+    lrwxrwxrwx 1 root root 23 Jan  8  2023 /usr/bin/gcc-12 -> x86_64-linux-gnu-gcc-12
+
+C library: Musl may be necessary if you have less than 32M main memory,
+otherwise, use glibc.
+
+Sometimes you can get a prebuilt toolchain from a vendor.  This may be worth
+doing but it's not a fully reliable option.  crosstool-NG and buildroot/Yocto
+all solve this issue, though.
+
+### crosstool-NG
+
+crosstool-ng is not in Debian.  As of the date of these notes 2024-02, the
+latest is 1.26.0.  You can install it doing the standard autotools method.  It
+installs a single binary, `ct-ng`.  It comes with some samples: `ct-ng
+list-samples`.
+
+One sample is quite close to our target board: `arm-cortex_a8-linux-gnueabi`
+GNU EABI is vs EABIHF (hard float).  EABIHF is not compatible with CPUs that
+don't have an FPU.  EABI passes floating point values in integer registers which
+is not as fast.
+
+    amoe@sprinkhaan $ ct-ng show-arm-cortex_a8-linux-gnueabi                                                                                                                                                    0.09s 
+    [G...]   arm-cortex_a8-linux-gnueabi
+        Languages       : C,C++
+        OS              : linux-6.4
+        Binutils        : binutils-2.40
+        Compiler        : gcc-13.2.0
+        C library       : glibc-2.38
+        Debug tools     : duma-2_5_21 gdb-13.2 ltrace-0.7.3 strace-6.4
+        Companion libs  : expat-2.5.0 gettext-0.21 gmp-6.2.1 isl-0.26 libelf-0.8.13 libiconv-1.16 mpc-1.2.1 mpfr-4.2.1 ncurses-6.4 zlib-1.2.13 zstd-1.5.5
+
+Run `ct-ng arm-cortex_a8-linux-gnueabi` to 'choose' this sample.  This writes a
+file in the current directory.  Then, `ct-ng menuconfig` will take you into a
+curses-based menu feature.
+
+You need to unselect "render the toolchain read only", and enable hardware FPU.
+Enabling hardware FPU switches to EABIHF, so we're deviating from the sample
+here.  menuconfig writes all your config into the .config file.  ct-ng also
+expects a local directory './src' to store tarballs in.  It downloads tarballs
+for all pieces.  It patches them.  Then, all pieces will be built in dependency
+order.
