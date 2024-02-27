@@ -157,7 +157,7 @@ GNU EABI is vs EABIHF (hard float).  EABIHF is not compatible with CPUs that
 don't have an FPU.  EABI passes floating point values in integer registers which
 is not as fast.
 
-    amoe@sprinkhaan $ ct-ng show-arm-cortex_a8-linux-gnueabi                                                                                                                                                    0.09s 
+    amoe@sprinkhaan $ ct-ng show-arm-cortex_a8-linux-gnueabi
     [G...]   arm-cortex_a8-linux-gnueabi
         Languages       : C,C++
         OS              : linux-6.4
