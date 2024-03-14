@@ -177,3 +177,134 @@ here.  menuconfig writes all your config into the .config file.  ct-ng also
 expects a local directory './src' to store tarballs in.  It downloads tarballs
 for all pieces.  It patches them.  Then, all pieces will be built in dependency
 order.
+
+ct-ng doesn't have great directory hygiene.  By default it stores things in the
+current directory as well as `~/x-tools`.  I modified it to set the prefix dir
+(`CT_PREFIX_DIR`) thus:
+
+    CT_PREFIX_DIR="/home/amoe/ct-ng/x-tools/${CT_HOST:+HOST-${CT_HOST}/}${CT_TARGET}"
+
+Of course it also stores temporary stuff in a local `build` directory.  You need
+a fairly large amount of free space to build the toolchain.
+
+I build 2 toolchains:
+
+* /home/amoe/ct-ng/x-tools/arm-cortex_a8-linux-gnueabihf
+* /home/amoe/ct-ng/x-tools/arm-unknown-linux-gnueabi
+
+That means the the Beaglebone compiler lives at:
+
+    /home/amoe/ct-ng/x-tools/arm-cortex_a8-linux-gnueabihf/bin/arm-cortex_a8-linux-gnueabihf-gcc
+
+There are no symlinks defining `gcc` -> the long name, everything has the
+toolchain tuple in its name.
+
+If I then run:
+
+    amoe@sprinkhaan $ ~/ct-ng/x-tools/arm-cortex_a8-linux-gnueabihf/bin/arm-cortex_a8-linux-gnueabihf-gcc -o hello hello.c
+
+
+I build my hello world program.  I can't execute this on sprinkhaan: I get
+
+    amoe@sprinkhaan $ ./hello                                                                        0.01s 
+    zsh: exec format error: ./hello
+
+Which is what I would expect.
+
+    amoe@sprinkhaan $ file hello                                                                     0.01s 
+    hello: ELF 32-bit LSB executable, ARM, EABI5 version 1 (SYSV), dynamically linked, interpreter /lib/ld-linux-armhf.so.3, for GNU/Linux 6.4.0, with debug_info, not stripped
+
+It shows that it's 32 bit which is interesting.  It's interesting that 32 bit is
+still a concern.
+
+Using this lil command you can list out the specs in a nice format:
+
+    ~/ct-ng/x-tools/arm-cortex_a8-linux-gnueabihf/bin/arm-cortex_a8-linux-gnueabihf-c++ -v 2>&1 | sed -n 's|Configured with: ||p' | tr ' ' '\n'
+
+This shows:
+
+    --build=x86_64-build_pc-linux-gnu
+    --host=x86_64-build_pc-linux-gnu
+    --target=arm-cortex_a8-linux-gnueabihf
+    --prefix=/home/amoe/ct-ng/x-tools/arm-cortex_a8-linux-gnueabihf
+    --exec_prefix=/home/amoe/ct-ng/x-tools/arm-cortex_a8-linux-gnueabihf
+    --with-sysroot=/home/amoe/ct-ng/x-tools/arm-cortex_a8-linux-gnueabihf/arm-cortex_a8-linux-gnueabihf/sysroot
+    --enable-languages=c,c++
+    --with-cpu=cortex-a8
+    --with-float=hard
+    --with-pkgversion='crosstool-NG
+    1.26.0'
+    --enable-__cxa_atexit
+    --disable-libmudflap
+    --disable-libgomp
+    --disable-libssp
+    --disable-libquadmath
+    --disable-libquadmath-support
+    --disable-libsanitizer
+    --disable-libmpx
+    --with-gmp=/home/amoe/ct-ng/build/arm-cortex_a8-linux-gnueabihf/buildtools
+    --with-mpfr=/home/amoe/ct-ng/build/arm-cortex_a8-linux-gnueabihf/buildtools
+    --with-mpc=/home/amoe/ct-ng/build/arm-cortex_a8-linux-gnueabihf/buildtools
+    --with-isl=/home/amoe/ct-ng/build/arm-cortex_a8-linux-gnueabihf/buildtools
+    --enable-lto
+    --enable-threads=posix
+    --enable-target-optspace
+    --enable-plugin
+    --enable-gold
+    --disable-nls
+    --disable-multilib
+    --with-local-prefix=/home/amoe/ct-ng/x-tools/arm-cortex_a8-linux-gnueabihf/arm-cortex_a8-linux-gnueabihf/sysroot
+    --enable-long-long
+
+There are two general approaches for handling toolchains in a project:
+
+1.  Built separate distinct toolchains for every target that you want to build
+    for.
+
+2.  Ensure you pass sufficient compiler options to a generic toolchain to
+    configure it entirely for the target.  (e.g. -mcpu=)
+
+
+CS refers to 1) as the "Buildroot philosophy", while 2) is the "Yocto
+philosophy".  2 sounds better, but you can't make an entirely generic toolchain
+
+Note that "-mcpu" was deprecated in GCC 13.  If a toolchain is built for ARM, it
+still can't compile for X86 and vice versa
+
+There is something called a sysroot:
+
+    /home/amoe/ct-ng/x-tools/arm-cortex_a8-linux-gnueabihf/arm-cortex_a8-linux-gnueabihf/sysroot
+
+This seems to contain a root filesystem?  It seems to be some sort of skeleton
+of an OS for the target.  Mostly headers, programs and shared data used to
+implement the C library.
+
+The C library comprises four components: libc, libm, libpthread, librt.
+
+We know what all of these do except for librt.  librt implements shared memory
+(`shm_open`) and asynchronous I/O (`aio_open` etc).
+
+Dynamically linking to libc is the default but you can also link statically by
+passing `-static` option.  A statically linked "hello world" is 2.8MB, but only
+12k if dynamically linked.  Static linking pulls in all the code from `libc.a`
+to link the C library.  Checking for `libc.a` under the sysroot shows that it is
+21MB in size.
+
+Creating a static library just means using the `ar` tool from the toolchain to
+put several `.o` files together.  You can do it yourself fairly easily.
+
+When compiling a dynamic library, you compile using the -`fPIC` switch.  I
+created examples of building both library types in the toolchain using
+`build_library.sh` in the repository root.
+
+The MELP repository contains a script called `list-libs`, this script invokes
+`readelf` from the toolchain in order to get information about a .so file.
+Readelf outputs a lot of info.
+
+    amoe@sprinkhaan $ ${TOOLCHAIN}/readelf -a libtest.so | grep NEEDED
+    0x00000001 (NEEDED)                     Shared library: [libc.so.6]
+
+This will tell you which libraries the .so file depends on and it also shows the
+location ot the runtime linker which is hardcoded into the executable.  The
+notorious `LD_LIBRARY_PATH` allows one to override the hardcoded search paths at
+runtime (which will presumably be prepended to the hardcoded one).
