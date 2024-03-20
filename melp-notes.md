@@ -308,3 +308,71 @@ This will tell you which libraries the .so file depends on and it also shows the
 location ot the runtime linker which is hardcoded into the executable.  The
 notorious `LD_LIBRARY_PATH` allows one to override the hardcoded search paths at
 runtime (which will presumably be prepended to the hardcoded one).
+
+XXX: What does position-independent code mean?  Due to virtual memory provided
+by Linux, each process sees its own address space and can't interfere with the
+address space of other programs (protected memory).  Hence non-PIC code may be
+"hardcoded" to run at 0x00004000, but that is still "relative" to the virtual
+memory space of the process (the actual memory address in global terms may be
+something different.)  It kind of makes sense that shared libraries would need
+to be compiled as PIC because they get compiled and loaded in a different
+command, but I'm still not sure it 100% makes sense.
+
+A version scheme exists consisting of several parts:
+* release version
+* soname
+
+A release version is a full version e.g. 8.0.2.
+A soname is a single integer representing the major version corresponding to a
+release version.  e.g. it would be 8 in the case of 8.0.2.
+Links exist: libjpeg.so.8 -> libjpeg.so.8.0.2
+When programs are built using a library, they request the soname link.  So it's
+possible to have multiple major versions of libraries installed on a system
+without stuff breaking.
+
+The link `libjpeg.so -> libjpeg.so.8.0.2` is used at build time -- it makes sure
+we pick up the default most-current version of the library when building.
+The link `libjpeg.so.8 -> libjpeg.so.8.0.2` is used at run time.
+
+Q: How do you set sonames and versions numbers?
+
+CS chooses not to cover CMake which I'm temporarily happy about.
+
+A make variable exists called CROSS_COMPILE.
+
+CS goes over a bit of stuff about configuring busybox but we don't have any
+practical demos yet so let's elide this for now.
+
+### Cross compiling open source packages
+
+You set certain variables in the environment to influence the behaviour of the
+autotools configure script:
+
+CC, CFLAGS, LDFLAGS (-L for example), LIBS (eg -lm), CPPFLAGS (preprocessor
+flags for includes), CPP (preprocessor command name)
+
+Autotools `./configure` also provides a way to override the "host" -- "host"
+means the eventual system that will "host" the running program, i.e. in this
+case it would be `arm-cortex_a8-linux-gnueabihf`.
+
+You also would want to set the prefix to be `/usr` because if it's linked
+against shared libraries, those libraries would be expected to be found there.
+
+So a typical cross compile command for a package that uses autotools would
+look as follows:
+
+    CC=arm-cortex_a8-linux-gnueabihf \
+      ./configure --host=arm-cortex_a8-linux-gnueabihf --prefix=/usr
+
+CS gives an example of how to cross compile sqlite.
+
+I created a script to implement this.  It's in `build_and_install_sqlite.sh`.
+It does seem to work and creates a `sqlite3` file in sysroot under the
+toolchain.  It also creates appropriate links for .so files.  Amusingly
+libsqlite is still on soname 0 meaning it has never broken API, but it does have
+3 in its name, which seems like a hack.
+
+Having installed these under the toolchain, you should then be able to compile
+and link.  And indeed it does seem to be possible!  As the stuff is already in
+the sysroot you can just use the toolchain's gcc.  The toolchain's gcc already
+knows about the locations of the libraries and the header files.

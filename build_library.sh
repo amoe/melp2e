@@ -18,3 +18,4 @@ OBJECTS="${BUILD_DIR}/test1.o ${BUILD_DIR}/test2.o"
 
 "$READELF" -a "${BUILD_DIR}/helloworld" | grep "Requesting program interpreter:"
 "$READELF" -a "${BUILD_DIR}/helloworld" | grep NEEDED
+
