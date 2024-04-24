@@ -376,3 +376,133 @@ Having installed these under the toolchain, you should then be able to compile
 and link.  And indeed it does seem to be possible!  As the stuff is already in
 the sysroot you can just use the toolchain's gcc.  The toolchain's gcc already
 knows about the locations of the libraries and the header files.
+
+### pkg-config
+
+pkg-config files are also installed under /usr/lib/pkgconfig under the sysroot.
+
+Using the environment variable `PKG_CONFIG_LIBDIR` you can force the pkg-config
+tool to read from the database under the sysroot:
+
+PKG_CONFIG_LIBDIR=$(getsysroot)/usr/lib/pkgconfig pkg-config sqlite3 --libs
+--cflags
+
+Whenever someone uses a non-autotools environment it probably necessitates a
+giant mess of hacks to fix the lack of support for cross compiling that
+inevitably results.  This is unsustainable for packages with lots of
+dependencies.
+
+
+## Ch2: Bootloaders
+
+The bootloader: *passes control from itself to the kernel using a device tree*.
+We will use U-Boot as an example.  How does it differ from grub?  There is also
+one called Barebox.
+
+The bootloader has two jobs: load the kernel, provide a device tree, and provide
+a kernel command line string.
+
+*Reset vector*: A specific location in non-volatile memory stores a pointer to
+the start instruction after system reset.  The CPU will jump to the value stored
+at the reset vector to start executing.
+
+A DRAM memory controller ensures the RAM's capacitors get refreshed.
+
+
+### Boot sequence 
+
+The modern way of booting involves multiple steps.  This is because the DRAM
+memory controller needs to be bootstrapped.  Modern bootloaders are too large to
+fit into the small amount of SRAM provided on 
+
+* Code hardcoded into ROM loads something called an SPL (secondary program
+  loader) into SRAM.  (DRAM can't be used yet.)
+* SPL sets up the memory controller to enable DRAM use.  SPL can read file
+  systems and pre-programmed file names.  The SPL loads the *tertiary program
+  loader* into DRAM.
+* The TPL loads into DRAM the kernel image, plus initramfs and a device tree.
+
+There seems to be 128kb of SRAM on the Sitara AM3358 which is indeed a small
+amount.
+
+
+### UEFI boot
+
+* Load UEFI firmware.
+* UEFI firmware initializes DRAM controller.  Loads "real" bootloader (TPL) from
+  UEFI system partition which must be FAT32 or FAT16.  This loader is found at a
+  hardcoded location.
+* TPL loads kernel, initramfs, device tree.
+
+
+There is more info available here:
+https://android.googlesource.com/kernel/msm/+/android-msm-hammerhead-3.4-kk-r1/Documentation/arm/Booting
+
+### Device trees
+
+There was something called "A tags" which is described above as "kernel tagged
+list".  But device trees are the successor to A tags, because they don't require
+information to be hardcoded into the kernel source.
+
+Device trees are specified in .dts files.
+
+Is there a validator for .dts files?  Not sure.
+
+The device tree is actually a graph, because nodes can have labels.
+
+The DTS file for Beaglebone Black is located at
+arch/arm/boot/dts/am335x-boneblack.dts in the kernel source tree.
+
+I have captured the memory below
+
+```
+/ {
+    #address-cells = <2>;
+    #size-cells = <2>;
+    memory@80000000 {
+        device_type = "memory";
+        reg = <0x00000000 0x80000000 0 0x80000000>;
+    };
+};
+```
+
+Here we have memory along with a reg property.
+The reg property defines two pairs.
+
+DTS files frequently use #include directives to capture base behaviour and
+implement types of inheritance to reduce duplication.
+
+OpenFirmware specifies the use of `/include/`, but the kernel source uses
+`#include`.
+
+The kernel's Kbuild build system runs the C preprocessor over the DTS files
+allowing use of CPP directives.
+
+You use the `&` notation to bind to previously defined nodes and modify/override
+them.
+
+```
+&mmc1 {
+    status = "okay";
+}
+```
+
+Here we override the `status` property and set it to `okay` which will cause it
+to be initialized with a device driver.  
+
+On the Beaglebone Black, we connect the MMC controller to a different voltage
+regulator:
+
+```
+&mmc1 {
+    vmmc-supply = <&vmmcsd_fixed>;
+}
+```
+
+Here we refer to a previously defined node `vmmcsd_fixed` via the label/phandle.
+
+The device tree compiler is named `dtc` and creates an output file `.dtb`, a
+_device tree blob_.  Dtc lives in the linux source.  It's package on Debian as
+`device-tree-compiler`.  It installs /usr/bin/dtc.
+
+Most stuff is built using Kbuild, though.
