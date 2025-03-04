@@ -506,3 +506,261 @@ _device tree blob_.  Dtc lives in the linux source.  It's package on Debian as
 `device-tree-compiler`.  It installs /usr/bin/dtc.
 
 Most stuff is built using Kbuild, though.
+
+### Choosing a bootloader
+
+We will focus on U-Boot because it supports a lot of architectures.  You can't
+use GRUB because it's x86 only.
+
+U-Boot is maintained by Denx.de.
+
+You can checkout the git repo for u-boot, then find a config for your board in
+the `configs` subdirectory.  The beaglebone is under
+`am335x_boneblack_defconfig`.  You can find the board-specific documentation
+under `vcs/u-boot/board/ti/am335x`.
+
+To build:
+
+* Set the env var CROSS_COMPILE
+
+This errored for me using the git tag `v2017.1`.
+I switched to master and it worked, but I don't know if that's right.
+
+### Installing
+
+Beaglebone has an sd card slot.
+
+You have to write the images to a card.
+
+microsd card of 8GB could be uesd.
+
+This is what the docs say:
+
+> The board is equipped with a single microSD connector to act as the secondary
+> boot source for the board and, if selected as such, can be the primary boot
+> source. The connector will support larger capacity microSD cards. The microSD
+> card is not provided with the board. Booting from MMC0 will be used to flash the
+> eMMC in the production environment or can be used by the user to update the SW
+> as needed.
+
+I don't know if we can find a microsd card lying around?  Maybe
+
+Writing the SD card:
+
+amoe@sprinkhaan $ lsblk                                                                                                                                                                                     0.00s 
+NAME        MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+sda           8:0    0 238.5G  0 disk 
+├─sda1        8:1    0   100M  0 part /boot/efi
+├─sda2        8:2    0    16M  0 part 
+├─sda3        8:3    0  63.5G  0 part 
+├─sda4        8:4    0   507M  0 part 
+├─sda5        8:5    0 172.5G  0 part /
+└─sda6        8:6    0   1.9G  0 part [SWAP]
+mmcblk0     179:0    0  14.8G  0 disk 
+└─mmcblk0p1 179:1    0  14.8G  0 part /media/amoe/8405-180
+
+This creates two partitions.  One for the bootloader and one for the root
+filesystem.  They are labelled 'boot' and 'rootfs'.
+
+This is a useful page re the serial cable: https://elinux.org/Beagleboard:BeagleBone_Black_Serial
+
+Plugging in the serial cable gives this:
+
+[13779.001567] usb 2-3: new full-speed USB device number 10 using xhci_hcd
+[13779.155380] usb 2-3: New USB device found, idVendor=0403, idProduct=6001, bcdDevice= 6.00
+[13779.155407] usb 2-3: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[13779.155419] usb 2-3: Product: FT232R USB UART
+[13779.155429] usb 2-3: Manufacturer: FTDI
+[13779.155437] usb 2-3: SerialNumber: AB8NXWYY
+[13779.181673] usbcore: registered new interface driver usbserial_generic
+[13779.181686] usbserial: USB Serial support registered for generic
+[13779.187558] usbcore: registered new interface driver ftdi_sio
+[13779.187574] usbserial: USB Serial support registered for FTDI USB Serial Device
+[13779.187616] ftdi_sio 2-3:1.0: FTDI USB Serial Device converter detected
+[13779.187646] usb 2-3: Detected FT232R
+[13779.188307] usb 2-3: FTDI USB Serial Device converter now attached to ttyUSB0
+
+And indeed /dev/ttyUSB0 appears on the host, independent of the board being
+powered on.
+
+gtkterm is a tool used to work with a serial console.
+
+You specify the bits-per-second when connecting to a serial port.  The magic
+number is 115200.
+
+PlusUSB mini in the board, and the lights comeon.
+
+It eventually comes up!
+
+It des notseemtohavebootedoffthereader.   -- it doesn't do so by default.
+
+There's a 'user boot' button.
+
+diagram here: https://docs.beagleboard.org/latest/boards/beaglebone/black/ch04.html
+
+The board accepts the following wall mount power supply:
+
+> This cable terminates with a 'standard' 5.5mm OD, 2.1mm ID positive tip
+> connector and matches with our 2.1mm extension cord, female terminal block
+> adapter, breadboard-friendly DC jack, etc.
+
+So:
+* 5V
+* 2A
+* UK plug
+* 5.5mm OD
+* 2.1mm ID positive tip
+
+
+Apparently this is 'needed' to boot from SD according to some sources.  However,
+overall the board just seems to have not booted from the SD.  I can't verify
+that the SD card has been written correctly, as sprinkhaan no longer seems to
+work with it.  I've ordered a PSU and a card reader.
+
+No it doesn't seem to work at all.  I'm not sure if this has some sort of dead
+SD card slot, or the card is wrong.  Apparently we can try something named
+'Balena Etcher'.  Doesn't seem to be much point in this as it's just a wrapper
+for dd?
+
+## Troubleshooting
+
+* Status of power supply -- Does not seem to make a difference.
+* Status of card writer -- Sprinkhaan's is still a little suspect.  I ordered a
+  Ugreen device, but it does not work.  I will sell this device on eBay.  I
+  still have an SD card reader.  I bought an Anker device, but it connects
+  through USB-C.  I don't think that I have any machines with a USB-C drive.
+* Status of SD card adapter -- trying to bypass this as a confusion factor.  
+* Status of card medium -- unknown?  Do we have another SDHC?
+* Status of socket on board -- unknown? This is the worst-case scenario
+* Status of bootloader -- unknown?  Unclear how to test (except by rebuilding)
+
+
+Relevant messages here:
+https://forum.beagleboard.org/t/cannot-see-u-boot-prompt-in-terminal/2416/25
+
+
+SD card confirmed good.
+
+U-Boot SPL 2019.04 - 
+
+
+# Book Erratum: the updated uboot uses this config file, rather than the plainer
+# am335x_boneblack_defconfig
+# Do not try to use the vboot boneblack one.  You must use EVM
+
+Problems were caused by using the wrong defconfig.  Now we can continue.
+
+What is the next step?
+We need to reach a 'U-Boot' prompt.
+
+MLO and u-boot.img are the ones used.
+You might hit a key to stop autobooting?
+
+Apparently, `bootcmd` is used to provide a default boot configuration for the
+device.
+
+debian:temppwd is the password for the default distribution.
+
+You can stop the system with 'half'.
+
+
+There is a short timeout to stop autoboot
+
+I am getting this output:
+
+```
+U-Boot SPL 2024.07-rc2-00066-g5c5565cfec (Feb 23 2025 - 13:42:51 +0000)
+Trying to boot from MMC1
+
+
+U-Boot 2024.07-rc2-00066-g5c5565cfec (Feb 23 2025 - 13:42:51 +0000)
+
+CPU  : AM335X-GP rev 2.1
+Model: TI AM335x BeagleBone Black
+DRAM:  512 MiB
+Core:  161 devices, 18 uclasses, devicetree: separate
+WDT:   Started wdt@44e35000 with servicing every 1000ms (60s timeout)
+NAND:  0 MiB
+MMC:   OMAP SD/MMC: 0, OMAP SD/MMC: 1
+Loading Environment from FAT... Unable to read "uboot.env" from mmc0:1... 
+<ethaddr> not set. Validating first E-fuse MAC
+Net:   eth2: ethernet@4a100000using musb-hdrc, OUT ep1out IN ep1in STATUS ep2in
+MAC de:ad:be:ef:00:01
+HOST MAC de:ad:be:ef:00:00
+RNDIS ready
+, eth3: usb_ether
+Hit any key to stop autoboot:  0 
+=> 
+```
+
+Commands:
+
+`help` works.
+Command line editing does not work, per MELP, but in fact it seems to, and
+supports Emacs keys.
+
+CS gives this example:
+
+`nand read 82000000 400000 200000`
+
+This responds: `no devices available`.  However, I don't think this command is
+intended to be run.
+
+# Environment variables
+
+These are stored in the _board configuration header file_.
+
+`printenv` will print all existing 'environment variables'.
+
+`setenv foo hello` will set the variable `foo` with the value `hello`.
+`printenv foo` will then print `hello`.
+
+You can use a `saveenv` command.  This will store the environment to FAT.  It
+seemed to work.  It gets stored somewhere, presumably on the SD card?  Unclear
+exactly where, but `foo=hello` continues to be defined after booting.  CS
+suggests that it might be in `uboot.env`?
+
+There is a command `mkimage`, which is provided by the package `u-boot-tools`,
+though I'm guessing it's also in the source tree.
+
+`help mmc` displays help on the MMC sub system
+
+`mmc list` shows:
+
+```
+=> mmc list
+OMAP SD/MMC: 0 (SD)
+OMAP SD/MMC: 1
+```
+
+One of these is the SD, one of them is eMMC.
+
+`fatload` is a command that you use to load a binary file from a dos filesystem.
+
+fatload <interface> [<dev[:part]> [<addr> [<filename> [bytes [pos]]]]]
+
+The default runtime location for the kernel is 0x80008000, this is an ARM
+convention.
+
+You can load over the network.  You need tftpd, and presumably also the device
+needs to be wired to your machine, it runs over UDP port 69.
+
+You finally boot with the `bootm` command:
+
+> bootm 82000000 - 83000000
+
+There is a bootcmd.  Default bootcmd that I saw is:
+
+```
+=> printenv bootcmd
+bootcmd=run findfdt; run init_console; run finduuid; run distro_bootcmd
+```
+
+You can find this defined in the board defconfig file as:
+
+```
+CONFIG_BOOTCOMMAND="run findfdt; run init_console; run finduuid; run distro_bootcmd"
+```
+
+
+So this is programmed in during build.

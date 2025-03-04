@@ -6,5 +6,3 @@ https://github.com/PacktPublishing/Mastering-Embedded-Linux-Programming-Second-E
 Errata: ???
 
 I should just list errata here if I find any.
-
-
