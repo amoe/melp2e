@@ -718,7 +718,7 @@ These are stored in the _board configuration header file_.
 You can use a `saveenv` command.  This will store the environment to FAT.  It
 seemed to work.  It gets stored somewhere, presumably on the SD card?  Unclear
 exactly where, but `foo=hello` continues to be defined after booting.  CS
-suggests that it might be in `uboot.env`?
+suggests that it might be in `uboot.env`?  (Confirmed: it is located in uboot.env.)
 
 There is a command `mkimage`, which is provided by the package `u-boot-tools`,
 though I'm guessing it's also in the source tree.
@@ -764,3 +764,32 @@ CONFIG_BOOTCOMMAND="run findfdt; run init_console; run finduuid; run distro_boot
 
 
 So this is programmed in during build.
+
+CS provides a patch file which is generated agains the tag 2017.01.  This is
+rather old.  BSP = Board Support Package.
+
+`common` contains the core functions for the command shell.
+
+`include/configs` contains most of the board configuration settings, these are
+in .h files.
+
+`configs` contains all the config files.
+
+I was using the branch starting at commit
+`5c5565cfec92eb7377ff7fe197612c6a813bb6c7`.
+
+We create nova_defconfig.
+
+XXX: I did not modify CONFIG_TARGET_NOVA (p71)
+
+XXX: I couldn't find the changes needed for u-boot.lds,
+
+XXX I added the prompt change to the defconfig file rather than the
+`include/configs/nova.h` file.
+
+XXX I had to copy all of the IMPLY statements in the
+arch/arm/mach-omap2/am335x/kconfig
+Just clone the am335x board to Nova.  We are just using this as a base for
+future modifications, I suppose.
+
+After doing this, it builds correctly, and indeed, it boots to a `nova!>` prompt.
